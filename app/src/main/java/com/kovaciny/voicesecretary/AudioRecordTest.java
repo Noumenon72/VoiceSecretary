@@ -27,13 +27,18 @@ import android.widget.Toast;
 import java.io.IOException;
 
 
-public class AudioRecordTest {
+public class AudioRecordTest implements MediaPlayer.OnErrorListener {
     private static final String LOG_TAG = "AudioRecordTest";
     private static String mFileName = null;
 
     private MediaRecorder mRecorder = null;
 
     private MediaPlayer mPlayer = null;
+
+    public AudioRecordTest() {
+        mFileName = Environment.getExternalStorageDirectory().getAbsolutePath();
+        mFileName += "/audiorecordtest.3gp";
+    }
 
     protected void onRecord(boolean start) {
         if (start) {
@@ -93,12 +98,6 @@ public class AudioRecordTest {
         mRecorder = null;
     }
 
-
-    public AudioRecordTest() {
-        mFileName = Environment.getExternalStorageDirectory().getAbsolutePath();
-        mFileName += "/audiorecordtest.3gp";
-    }
-
     public void onPause() {
         if (mRecorder != null) {
             mRecorder.release();
@@ -109,5 +108,12 @@ public class AudioRecordTest {
             mPlayer.release();
             mPlayer = null;
         }
+    }
+
+    @Override
+    public boolean onError(MediaPlayer mp, int what, int extra) {
+        Log.e(LOG_TAG, String.format("Error(%s%s)", what, extra));
+        mp.reset();
+        return true;
     }
 }

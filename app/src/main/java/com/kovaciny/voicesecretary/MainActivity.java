@@ -6,9 +6,11 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
 import android.graphics.Color;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -19,12 +21,18 @@ import android.widget.LinearLayout;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     private String mFilename;
     private MediaRecorder mRecorder;
     private RecordButton mRecordButton = null;
     private PlayButton mPlayButton = null;
+    private Button mAlarmListButton;
     private TimePicker mTimePicker = null;
     protected AudioRecordTest mAudioRecord = new AudioRecordTest();
 
@@ -32,68 +40,85 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        final int appFlags = this.getApplicationInfo().flags;
+        final boolean DEBUG = (appFlags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+
         setContentView(R.layout.activity_main);
 
         final Button button = (Button) findViewById(R.id.btnSetAlarm);
         if (button != null) {
             button.setBackgroundResource(android.R.drawable.btn_default);
-            button.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    v.setBackgroundColor( Color.RED );
-                    SetAlarm();
-                }
-            });
+            button.setOnClickListener(this);
         }
 
-        final Button
+        mAlarmListButton = (Button) findViewById(R.id.btnViewAlarms);
+        if (mAlarmListButton != null) {
+            mAlarmListButton.setOnClickListener(this);
+        }
 
         mRecordButton = new RecordButton(this);
-        LinearLayout ll = ((LinearLayout) findViewById(R.id.audiorecord));
-        ll.addView(mRecordButton,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        0));
         mPlayButton = new PlayButton(this);
-        ll.addView(mPlayButton,
+        LinearLayout ll = ((LinearLayout) findViewById(R.id.audiorecord));
+        if (ll != null) {
+            ll.addView(mRecordButton,
                 new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         0));
+            ll.addView(mPlayButton,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        0));
+        }
 
         mTimePicker = (TimePicker) findViewById(R.id.timePicker);
-        MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.videorecord);
-        mp.start();
+
+        if (DEBUG) {
+            MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.videorecord);
+            mp.start();
+        }
     }
 
     public void SetAlarm()
     {
         final Button button = (Button) findViewById(R.id.btnSetAlarm);
-        assert button != null;
-        BroadcastReceiver receiver = new BroadcastReceiver() {
-            @Override public void onReceive( Context context, Intent _ )
-            {
-                MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.videorecord);
-                mp.start();
-                mAudioRecord.onPlay(true);
-                context.unregisterReceiver( this ); // this == BroadcastReceiver, not Activity
-            }
-        };
-
-        this.registerReceiver(receiver, new IntentFilter("com.kovaciny.reminder"));
+        if (button != null) {
+            BroadcastReceiver receiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent _) {
+                    MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.videorecord);
+                    mp.start();
+                    mAudioRecord.onPlay(true);
+                    context.unregisterReceiver(this); // this == BroadcastReceiver, not Activity
+                }
+            };
+            this.registerReceiver(receiver, new IntentFilter("com.kovaciny.reminder"));
+        }
 
         PendingIntent pintent = PendingIntent.getBroadcast( this, 0, new Intent("com.kovaciny.reminder"), 0 );
         AlarmManager manager = (AlarmManager)(this.getSystemService( Context.ALARM_SERVICE ));
 
-        // set alarm to fire 5 sec (1000*5) from now (SystemClock.elapsedRealtime())
+        int hour, minute;
+        if(Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            hour = mTimePicker.getCurrentHour();
+            minute = mTimePicker.getCurrentMinute();
+        } else {
+            hour = mTimePicker.getHour();
+            minute = mTimePicker.getMinute();
+        }
+        GregorianCalendar calendar = new GregorianCalendar();
+        calendar.set(Calendar.HOUR_OF_DAY, hour);
+        calendar.set(Calendar.MINUTE, minute);
+        long triggerAtMillis = calendar.getTimeInMillis();
+        SimpleDateFormat formatter = new SimpleDateFormat("hh:mm a EEEE, MMMM d");
+        String formattedDateString = formatter.format(calendar.getTime());
 
-        int hour = mTimePicker.getCurrentHour();
-        int minute = mTimePicker.getCurrentMinute();
-        Toast.makeText(this, String.format("setting alarm for %1d:%2d", hour, minute), Toast.LENGTH_SHORT)
+        Toast.makeText(this, "setting alarm for " + formattedDateString, Toast.LENGTH_LONG)
                 .show();
-        manager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 1000 * 2, pintent);
+        manager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pintent);
     }
+
 
     @Override
     public void onClick(View v) {
@@ -101,6 +126,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case 0:
                 MediaPlayer mp = MediaPlayer.create(getApplicationContext(), R.raw.videorecord);
                 mp.start();
+                break;
+            case R.id.btnSetAlarm:
+                SetAlarm();
+                break;
+            case R.id.btnViewAlarms:
+                Intent intent = new Intent(MainActivity.this, AlarmListActivity.class);
+                MainActivity.this.startActivity(intent);
                 break;
         }
     }
@@ -128,6 +160,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public RecordButton(Context ctx) {
             super(ctx);
             setOnClickListener(clicker);
+            setText("Start recording!");
         }
     }
 

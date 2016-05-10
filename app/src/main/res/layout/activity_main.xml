@@ -12,7 +12,7 @@
     android:gravity="center_horizontal">
 
     <LinearLayout
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
@@ -24,8 +24,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            tools:text="4/6/2016"
-            style="@android:style/Widget.Holo.Spinner" />
+            tools:text="4/6/2016" />
 
     </LinearLayout>
 
